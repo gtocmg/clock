@@ -24,8 +24,9 @@
 
         #time_is_link {
             color: #6ec1e4;
-            text-decoration: none;
+            text-decoration: underline; /* Forcer le soulignement */
             font-size: 36px;
+            pointer-events: auto; /* S'assurer que le lien est cliquable */
         }
 
         #Canada_z18a {
@@ -36,8 +37,9 @@
 </head>
 <body>
     <div class="time-widget">
-        <a href="https://time.is/Canada" id="time_is_link" rel="nofollow">Time in Canada:</a>
-        <span id="Canada_z18a"></span>
+        <a href="https://time.is/Canada" id="time_is_link" rel="nofollow">
+            <span id="Canada_z18a"></span>
+        </a>
     </div>
 
     <script src="//widget.time.is/t.js"></script>
