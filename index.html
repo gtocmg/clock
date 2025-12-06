@@ -20,11 +20,12 @@
 
         .time-widget {
             background-color: #222222;
-            padding: 20px;
+            padding: 10px; /* Réduit le padding pour réduire la taille globale */
             border-radius: 10px;
             display: inline-block;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
             pointer-events: none; /* Empêche l'interaction avec tout le contenu de cette div */
+            user-select: none; /* Empêche la sélection du texte */
         }
 
         #time_is_link {
@@ -33,8 +34,8 @@
         }
 
         #Canada_z18a {
-            font-size: 36px;
-            margin-top: 10px;
+            font-size: 18px; /* Réduit la taille du texte à 50% */
+            margin-top: 5px; /* Ajuste l'espacement */
         }
     </style>
 </head>
