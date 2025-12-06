@@ -26,7 +26,9 @@
             color: #6ec1e4;
             text-decoration: underline; /* Forcer le soulignement */
             font-size: 36px;
-            pointer-events: auto; /* S'assurer que le lien est cliquable */
+            pointer-events: auto; /* Assurer que le lien est cliquable */
+            position: absolute; /* Le rendre invisible mais cliquable */
+            left: -9999px; /* Cacher le lien hors de l'écran */
         }
 
         #Canada_z18a {
@@ -37,9 +39,9 @@
 </head>
 <body>
     <div class="time-widget">
-        <a href="https://time.is/Canada" id="time_is_link" rel="nofollow">
-            <span id="Canada_z18a"></span>
-        </a>
+        <span id="Canada_z18a"></span>
+        
+        <a href="https://time.is/Canada" id="time_is_link" rel="nofollow"></a>
     </div>
 
     <script src="//widget.time.is/t.js"></script>
