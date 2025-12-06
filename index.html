@@ -27,10 +27,8 @@
         }
 
         #time_is_link {
-            color: transparent;  /* Cacher la couleur */
-            text-decoration: none; /* Supprimer le soulignement */
-            position: absolute; /* Le rendre invisible mais cliquable */
-            left: -9999px; /* Cacher le lien hors de l'écran */
+            visibility: hidden;  /* Rendre le lien invisible */
+            pointer-events: none; /* Désactiver l'interaction avec le lien */
         }
 
         #Canada_z18a {
@@ -49,7 +47,7 @@
         time_is_widget.init({Canada_z18a:{}});
     </script>
     
-    <!-- Lien caché mais cliquable -->
+    <!-- Lien caché mais non cliquable -->
     <a href="https://time.is/Canada" id="time_is_link" rel="nofollow"></a>
 </body>
 </html>
