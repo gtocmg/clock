@@ -19,11 +19,9 @@
         }
 
         .time-widget {
-            background-color: #222222;
+            background-color: #000000; /* Fond noir */
             padding: 10px; /* Réduit le padding pour réduire la taille globale */
-            border-radius: 10px;
             display: inline-block;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
             pointer-events: none; /* Empêche l'interaction avec tout le contenu de cette div */
             user-select: none; /* Empêche la sélection du texte */
         }
@@ -46,16 +44,16 @@
 
     <script src="//widget.time.is/t.js"></script>
     <script>
-        // Fonction pour initialiser et mettre à jour le widget toutes les secondes
+        // Fonction pour initialiser et mettre à jour le widget toutes les 5 secondes
         function refreshWidget() {
-            time_is_widget.init({Canada_z18a:{}});
+            time_is_widget.init({Canada_z18a:{}}); 
         }
 
         // Initialiser le widget une première fois
         refreshWidget();
 
-        // Rafraîchir le widget toutes les secondes
-        setInterval(refreshWidget, 1000); // 1000ms = 1 seconde
+        // Rafraîchir le widget toutes les 5 secondes
+        setInterval(refreshWidget, 5000); // 5000ms = 5 secondes
     </script>
     
     <!-- Lien caché mais non cliquable -->
