@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Widget Time.is Canada</title>
 
+    <!-- Lien vers le fichier manifest pour la PWA -->
+    <link rel="manifest" href="manifest.json">
+
     <style>
         body {
             margin: 0;
@@ -21,6 +24,7 @@
             border-radius: 10px;
             display: inline-block;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            pointer-events: none; /* Empêche l'interaction avec tout le contenu de cette div */
         }
 
         #time_is_link {
