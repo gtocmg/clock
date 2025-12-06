@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Widget Time.is Canada</title>
+
+    <!-- Lien vers le fichier manifest pour la PWA -->
+    <link rel="manifest" href="manifest.json">
+
     <style>
         body {
             margin: 0;
@@ -23,10 +27,8 @@
         }
 
         #time_is_link {
-            color: #6ec1e4;
-            text-decoration: underline; /* Forcer le soulignement */
-            font-size: 36px;
-            pointer-events: auto; /* Assurer que le lien est cliquable */
+            color: transparent;  /* Cacher la couleur */
+            text-decoration: none; /* Supprimer le soulignement */
             position: absolute; /* Le rendre invisible mais cliquable */
             left: -9999px; /* Cacher le lien hors de l'écran */
         }
@@ -40,13 +42,14 @@
 <body>
     <div class="time-widget">
         <span id="Canada_z18a"></span>
-        
-        <a href="https://time.is/Canada" id="time_is_link" rel="nofollow"></a>
     </div>
 
     <script src="//widget.time.is/t.js"></script>
     <script>
         time_is_widget.init({Canada_z18a:{}});
     </script>
+    
+    <!-- Lien caché mais cliquable -->
+    <a href="https://time.is/Canada" id="time_is_link" rel="nofollow"></a>
 </body>
 </html>
