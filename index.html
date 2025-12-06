@@ -46,7 +46,16 @@
 
     <script src="//widget.time.is/t.js"></script>
     <script>
-        time_is_widget.init({Canada_z18a:{}});
+        // Fonction pour initialiser et mettre à jour le widget toutes les secondes
+        function refreshWidget() {
+            time_is_widget.init({Canada_z18a:{}});
+        }
+
+        // Initialiser le widget une première fois
+        refreshWidget();
+
+        // Rafraîchir le widget toutes les secondes
+        setInterval(refreshWidget, 1000); // 1000ms = 1 seconde
     </script>
     
     <!-- Lien caché mais non cliquable -->
