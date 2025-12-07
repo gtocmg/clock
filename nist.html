@@ -1,88 +1,106 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heure NIST</title>
-
-    <style>
-        body {
-            margin: 10;
-            padding: 0;
-            background-color: #000000;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
-            text-align: center;
-        }
-
-        .time-widget {
-            background-color: #000000;
-            padding: 0px;
-            display: inline-block;
-            pointer-events: none;
-            user-select: none;
-        }
-
-        #clock {
-            font-size: 18px;
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Heure NIST — ET (UTC-5)</title>
+<style>
+  body {
+    margin: 10px;
+    padding: 0;
+    background-color: #000000;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+  .time-widget {
+    background-color: #000000;
+    padding: 0;
+    display: inline-block;
+    pointer-events: none;
+    user-select: none;
+  }
+  #clock {
+    font-size: 18px; /* conforme à ton exemple */
+    margin-top: 5px;
+    line-height: 1;
+    font-weight: normal;
+  }
+</style>
 </head>
 <body>
+  <div class="time-widget">
+    <span id="clock">--:--:--</span>
+  </div>
 
-    <div class="time-widget">
-        <span id="clock">--:--:--</span>
-    </div>
+<script>
+/*
+  Récupère microsecondes depuis time.gov every 10s.
+  stocke en BigInt pour éviter perte de précision.
+  Calcule temps actuel en ajoutant delta = (performance.now() - serverPerf) * 1000 (microsec).
+  Convertit en millisecondes, applique offset UTC-5, puis utilise getUTC* pour extraire HH:MM:SS.
+*/
+const FETCH_URL = 'https://time.gov/widget/dhtml/at_nist_use_only.cgi';
+const FETCH_INTERVAL_MS = 10000;
+const RENDER_INTERVAL_MS = 200; // update often to keep affichage fluide
+const EASTERN_OFFSET_HOURS = -5;
 
-    <script>
-        let lastSync = null;
-        let lastServerTime = null;
+let serverMicro = null; // BigInt microsecondes depuis epoch UTC
+let serverPerfMs = null; // performance.now() en ms au moment de la réception
+let lastRaw = null;
 
-        async function syncTime() {
-            try {
-                const response = await fetch("https://time.gov/widget/dhtml/at_nist_use_only.cgi");
-                const text = await response.text();
+const clockEl = document.getElementById('clock');
 
-                const match = text.match(/time="(\d+)"/);
-                if (!match) return;
+function pad(n, len = 2){ return String(n).padStart(len, '0'); }
 
-                const microTs = Number(match[1]);
+function formatHHMMSSFromMicroBig(currentMicroBig){
+  // currentMicroBig : BigInt microsecondes UTC
+  const msBig = currentMicroBig / 1000n;           // BigInt ms
+  const msNumber = Number(msBig);                  // safe for epoch range
+  // Apply fixed offset (UTC-5): add EASTERN_OFFSET_HOURS * 3600_000
+  const shiftedMsForUTC = msNumber + EASTERN_OFFSET_HOURS * 3600_000;
+  const d = new Date(shiftedMsForUTC);
+  // Use getUTC* to avoid browser local TZ interference
+  const hh = pad(d.getUTCHours(),2);
+  const mm = pad(d.getUTCMinutes(),2);
+  const ss = pad(d.getUTCSeconds(),2);
+  return `${hh}:${mm}:${ss}`;
+}
 
-                // Converti en Date (UTC)
-                const dateUtc = new Date(microTs / 1000);
+function render(){
+  if (serverMicro === null){
+    clockEl.textContent = '--:--:--';
+    return;
+  }
+  const deltaMs = performance.now() - serverPerfMs;
+  const deltaMicro = BigInt(Math.round(deltaMs * 1000));
+  const currentMicro = serverMicro + deltaMicro;
+  clockEl.textContent = formatHHMMSSFromMicroBig(currentMicro);
+}
 
-                // Converti en Eastern Time (UTC-5)
-                const dateEst = new Date(dateUtc.getTime() - 5 * 3600 * 1000);
+async function fetchServerTime(){
+  try {
+    const resp = await fetch(FETCH_URL, {cache: 'no-store'});
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = (await resp.text()).trim();
+    lastRaw = text;
+    // extract large integer (handles raw number or XML like <timestamp time="1765..." />)
+    const m = text.match(/(\d{13,})/);
+    if (!m) throw new Error('Format invalide: ' + text);
+    serverMicro = BigInt(m[1]);
+    serverPerfMs = performance.now();
+    render(); // update immediate
+  } catch (e) {
+    // Silencieusement ne casse pas le widget ; conserve l'affichage courant.
+    console.warn('sync error', e);
+  }
+}
 
-                lastSync = Date.now();
-                lastServerTime = dateEst;
-            } catch (e) {
-                console.error("Erreur sync:", e);
-            }
-        }
-
-        function updateClock() {
-            if (!lastServerTime) return;
-
-            const now = Date.now();
-            const diff = now - lastSync;
-
-            const current = new Date(lastServerTime.getTime() + diff);
-
-            const hh = current.getHours().toString().padStart(2, "0");
-            const mm = current.getMinutes().toString().padStart(2, "0");
-            const ss = current.getSeconds().toString().padStart(2, "0");
-
-            document.getElementById("clock").textContent = `${hh}:${mm}:${ss}`;
-        }
-
-        // Sync NIST toutes les 10 s
-        syncTime();
-        setInterval(syncTime, 10000);
-
-        // Mise à jour de l'affichage chaque seconde
-        setInterval(updateClock, 1000);
-    </script>
-
+/* Start */
+fetchServerTime();
+setInterval(fetchServerTime, FETCH_INTERVAL_MS);
+setInterval(render, RENDER_INTERVAL_MS);
+requestAnimationFrame(function loop(){ render(); requestAnimationFrame(loop); });
+</script>
 </body>
 </html>
