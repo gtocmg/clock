@@ -81,8 +81,8 @@
         /* Code pour l'horloge NIST avec offset UTC-5 */
 
         const FETCH_URL = 'https://time.gov/widget/dhtml/at_nist_use_only.cgi';
-        const FETCH_INTERVAL_MS = 10000;
-        const RENDER_INTERVAL_MS = 200;
+        const FETCH_INTERVAL_MS = 10000;  // Toujours 10 secondes entre les appels réseau
+        const RENDER_INTERVAL_MS = 200;   // 200ms entre chaque rafraîchissement visuel (5 fois par seconde)
         const EASTERN_OFFSET_HOURS = -5;
 
         let serverMicro = null;
@@ -132,8 +132,8 @@
         }
 
         fetchServerTime();
-        setInterval(fetchServerTime, FETCH_INTERVAL_MS);
-        setInterval(render, RENDER_INTERVAL_MS);
+        setInterval(fetchServerTime, FETCH_INTERVAL_MS);  // Rafraîchissement des données réseau toutes les 10 secondes
+        setInterval(render, RENDER_INTERVAL_MS);  // Rafraîchissement visuel toutes les 200ms (5 fois par seconde)
         requestAnimationFrame(function loop() { render(); requestAnimationFrame(loop); });
     </script>
 </body>
