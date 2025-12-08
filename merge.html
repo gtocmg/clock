@@ -43,6 +43,11 @@
             justify-content: center;
             align-items: center;
         }
+
+        #time_is_link {
+            visibility: hidden;  /* Rendre le lien invisible */
+            pointer-events: none; /* Désactiver l'interaction avec le lien */
+        }        
     </style>
 </head>
 <body>
@@ -68,6 +73,9 @@
         refreshWidget();
         setInterval(refreshWidget, 5000); // Rafraîchissement toutes les 5 secondes
     </script>
+
+    <!-- Lien caché mais non cliquable -->
+    <a href="https://time.is/Canada" id="time_is_link" rel="nofollow"></a>
 
     <script>
         /* Code pour l'horloge NIST avec offset UTC-5 */
