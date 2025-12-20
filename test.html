@@ -167,25 +167,45 @@ const clockEl = document.getElementById('clock');
 
             // Combien de microsecondes avant la prochaine seconde exacte ?
             const remainder = nowMicro % 1000000n;
-            let waitMicro = 1000000n - remainder;
+            const waitMicro = 1000000n - remainder;
 
-            // setTimeout est en ms; on convertit et on ajoute un mini-fudge pour éviter un tick trop tôt
-            let waitMs = Number(waitMicro / 1000n);
+            // 1) On se réveille un peu AVANT le tick (pour compenser le jitter des timers)
+            //    35-50ms est un bon compromis (CPU quasi nul).
+            let waitMs = Number(waitMicro / 1000n) - 40;
             if (waitMs < 0) waitMs = 0;
 
             tickTimer = setTimeout(() => {
-                // "Chasse" le tick: si on est encore avant le changement de seconde, on re-check vite
-                render();
-                // Petite boucle de rattrapage (max 3 fois) si le timer s'est déclenché trop tôt/trop tard
-                let tries = 0;
-                const chase = () => {
-                    tries++;
-                    render();
-                    if (tries < 3) setTimeout(chase, 20);
-                };
-                setTimeout(chase, 20);
+                // 2) Phase "chase": on utilise rAF pendant une très courte fenêtre
+                //    pour détecter précisément le changement de seconde sans tourner en boucle 60fps toute la journée.
+                const start = performance.now();
+                let lastSec = null;
 
-                scheduleNextTick();
+                const step = () => {
+                    // Recalcule le temps courant
+                    const dMs = performance.now() - serverPerfMs;
+                    const curMicro = serverMicro + BigInt(Math.round(dMs * 1000));
+                    const sec = curMicro / 1000000n; // seconde entière (BigInt)
+
+                    if (lastSec === null) lastSec = sec;
+
+                    // Dès que la seconde a changé: render et on reschedule
+                    if (sec !== lastSec) {
+                        render();
+                        scheduleNextTick();
+                        return;
+                    }
+
+                    // Timeout de sécurité (évite de rester coincé si tab throttled)
+                    if (performance.now() - start > 140) {
+                        render();
+                        scheduleNextTick();
+                        return;
+                    }
+
+                    requestAnimationFrame(step);
+                };
+
+                requestAnimationFrame(step);
             }, waitMs);
         }
 
