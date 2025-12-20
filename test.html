@@ -129,11 +129,26 @@ const clockEl = document.getElementById('clock');
             clockEl.textContent = formatHHMMSSFromMicroBig(currentMicro);
         }
 
+        
+        async function nistFetchText(url) {
+            // 1) Normal browser fetch (may fail due to CORS depending on origin)
+            try {
+                const resp = await fetch(url, { cache: 'no-store' });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return (await resp.text()).trim();
+            } catch (e) {
+                // 2) Electron fallback: preload can expose window.nistProxyFetch(url) to bypass CORS safely
+                if (typeof window !== 'undefined' && typeof window.nistProxyFetch === 'function') {
+                    const txt = await window.nistProxyFetch(url);
+                    return String(txt || '').trim();
+                }
+                throw e;
+            }
+        }
+
         async function fetchServerTime() {
             try {
-                const resp = await fetch(FETCH_URL, {cache: 'no-store'});
-                if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                const text = (await resp.text()).trim();
+                const text = await nistFetchText(FETCH_URL);
                 lastRaw = text;
                 const m = text.match(/(\d{13,})/);
                 if (!m) throw new Error('Format invalide: ' + text);
@@ -142,6 +157,12 @@ const clockEl = document.getElementById('clock');
                 render();
             } catch (e) {
                 console.warn('sync error', e);
+                // Show something visible so you know it's blocked (often CORS when loaded from file://)
+                if (lastShown !== 'NIST ERR') {
+                    clockEl.textContent = '--:--:--';
+                    clockEl.title = 'NIST sync error: ' + (e && e.message ? e.message : String(e));
+                    lastShown = 'NIST ERR';
+                }
             }
         }
 
