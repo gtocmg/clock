@@ -74,32 +74,31 @@
     <a href="https://time.is/Canada" id="time_is_link" rel="nofollow"></a>
 
     <script>
-        /* Code pour l'horloge NIST avec offset UTC-5 */
+        /* Horloge NIST (time.gov) — légère + tick aligné (réduit le délai visuel) */
 
         const FETCH_URL = 'https://time.gov/widget/dhtml/at_nist_use_only.cgi';
-        const FETCH_INTERVAL_MS = 10000;  // Toujours 10 secondes entre les appels réseau
-        const RENDER_INTERVAL_MS = 250;   // boucle légère (250ms) pour coller au tick de la seconde
+        const FETCH_INTERVAL_MS = 10000;  // réseau: 10s
+        const RENDER_FALLBACK_MS = 250;   // boucle légère (le DOM ne change que si la seconde change)
         const EASTERN_OFFSET_HOURS = -5;
 
-        let serverMicro = null;
-        let serverPerfMs = null;
-        let lastRaw = null;
-
-        
+        let serverMicro = null;  // microsecondes (BigInt)
+        let serverPerfMs = null; // perf.now() au moment de référence
         let lastShown = null;
-const clockEl = document.getElementById('clock');
+
+        const clockEl = document.getElementById('clock');
 
         function pad(n, len = 2) { return String(n).padStart(len, '0'); }
 
         function formatHHMMSSFromMicroBig(currentMicroBig) {
-            const msBig = currentMicroBig / 1000n;
-            const msNumber = Number(msBig);
-            const shiftedMsForUTC = msNumber + EASTERN_OFFSET_HOURS * 3600_000;
-            const d = new Date(shiftedMsForUTC);
-            const hh = pad(d.getUTCHours(), 2);
-            const mm = pad(d.getUTCMinutes(), 2);
-            const ss = pad(d.getUTCSeconds(), 2);
-            return `${hh}:${mm}:${ss}`;
+            // microseconds -> ms
+            const ms = Number(currentMicroBig / 1000n);
+            const d = new Date(ms);
+
+            // Conserver le comportement original (offset fixe -5)
+            const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+            const eastern = new Date(utc + (EASTERN_OFFSET_HOURS * 3600000));
+
+            return `${pad(eastern.getHours())}:${pad(eastern.getMinutes())}:${pad(eastern.getSeconds())}`;
         }
 
         function render() {
@@ -110,9 +109,9 @@ const clockEl = document.getElementById('clock');
                 }
                 return;
             }
+
             const deltaMs = performance.now() - serverPerfMs;
-            const deltaMicro = BigInt(Math.round(deltaMs * 1000));
-            const currentMicro = serverMicro + deltaMicro;
+            const currentMicro = serverMicro + BigInt(Math.round(deltaMs * 1000));
 
             const txt = formatHHMMSSFromMicroBig(currentMicro);
             if (txt !== lastShown) {
@@ -122,31 +121,32 @@ const clockEl = document.getElementById('clock');
         }
 
         async function fetchServerTime() {
-            // Mesure RTT pour corriger un peu le décalage (approx RTT/2)
+            // RTT/2 correction simple pour réduire l'offset
             const t0 = performance.now();
             try {
-                const resp = await fetch(FETCH_URL, {cache: 'no-store'});
+                const resp = await fetch(FETCH_URL, { cache: 'no-store' });
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 const text = (await resp.text()).trim();
-                lastRaw = text;
+
                 const m = text.match(/(\d{13,})/);
                 if (!m) throw new Error('Format invalide: ' + text);
-                serverMicro = BigInt(m[1]);
+
+                let micro = BigInt(m[1]);
                 const t1 = performance.now();
-                // Corrige d'environ la moitié du RTT
+
                 const rttHalfMicro = BigInt(Math.round(((t1 - t0) / 2) * 1000));
-                serverMicro = serverMicro + rttHalfMicro;
+                micro = micro + rttHalfMicro;
+
+                serverMicro = micro;
                 serverPerfMs = t1;
+
                 render();
             } catch (e) {
-                console.warn('sync error', e);
+                console.warn('NIST sync error', e);
             }
         }
 
-        fetchServerTime();
-        setInterval(fetchServerTime, FETCH_INTERVAL_MS);  // Sync réseau périodique
-
-        // --- Render "synced" : aligne l'update sur le changement de seconde (évite d'avoir ~1s de retard) ---
+        // --- Tick aligné ---
         let tickTimer = null;
 
         function clearTick() {
@@ -157,45 +157,37 @@ const clockEl = document.getElementById('clock');
             clearTick();
 
             if (serverMicro === null || serverPerfMs === null) {
-                tickTimer = setTimeout(scheduleNextTick, 500);
+                tickTimer = setTimeout(scheduleNextTick, 300);
                 return;
             }
 
-            // Temps courant estimé en microsecondes
             const deltaMs = performance.now() - serverPerfMs;
             const nowMicro = serverMicro + BigInt(Math.round(deltaMs * 1000));
 
-            // Combien de microsecondes avant la prochaine seconde exacte ?
             const remainder = nowMicro % 1000000n;
             const waitMicro = 1000000n - remainder;
 
-            // 1) On se réveille un peu AVANT le tick (pour compenser le jitter des timers)
-            //    35-50ms est un bon compromis (CPU quasi nul).
+            // Réveille ~40ms avant le tick pour compenser le jitter
             let waitMs = Number(waitMicro / 1000n) - 40;
             if (waitMs < 0) waitMs = 0;
 
             tickTimer = setTimeout(() => {
-                // 2) Phase "chase": on utilise rAF pendant une très courte fenêtre
-                //    pour détecter précisément le changement de seconde sans tourner en boucle 60fps toute la journée.
                 const start = performance.now();
                 let lastSec = null;
 
                 const step = () => {
-                    // Recalcule le temps courant
                     const dMs = performance.now() - serverPerfMs;
                     const curMicro = serverMicro + BigInt(Math.round(dMs * 1000));
-                    const sec = curMicro / 1000000n; // seconde entière (BigInt)
+                    const sec = curMicro / 1000000n;
 
                     if (lastSec === null) lastSec = sec;
 
-                    // Dès que la seconde a changé: render et on reschedule
                     if (sec !== lastSec) {
                         render();
                         scheduleNextTick();
                         return;
                     }
 
-                    // Timeout de sécurité (évite de rester coincé si tab throttled)
                     if (performance.now() - start > 140) {
                         render();
                         scheduleNextTick();
@@ -209,15 +201,28 @@ const clockEl = document.getElementById('clock');
             }, waitMs);
         }
 
-        // Aussi, on fait un render léger toutes les 250ms, mais le DOM ne bouge que si la seconde change
-        // (ça aide à réduire l'effet "lag" si le navigateur throttle les timers)
-        setInterval(render, RENDER_INTERVAL_MS);
+        // Bootstrap immédiat: pas de "délai au début"
+        serverMicro = BigInt(Date.now()) * 1000n;
+        serverPerfMs = performance.now();
+        render();
 
-        scheduleNextTick();// (Optionnel) Évite du travail inutile quand l'onglet est en arrière-plan
-        document.addEventListener('visibilitychange', () => {
-            // Rien de spécial à faire: le render est déjà léger (1Hz),
-            // mais tu peux stopper/relancer les intervals ici si tu veux.
-        });  // Rafraîchissement visuel toutes les 200ms (5 fois par seconde)
-</script>
+        // Warmup: 3 syncs rapides au démarrage pour réduire l'offset initial
+        (async () => {
+            try {
+                await fetchServerTime();
+                await new Promise(r => setTimeout(r, 250));
+                await fetchServerTime();
+                await new Promise(r => setTimeout(r, 250));
+                await fetchServerTime();
+            } catch (e) {
+                console.warn('warmup error', e);
+            }
+        })();
+
+        setInterval(fetchServerTime, FETCH_INTERVAL_MS);
+        setInterval(render, RENDER_FALLBACK_MS); // léger: le DOM change max 1x/sec
+
+        scheduleNextTick();
+    </script>
 </body>
 </html>
