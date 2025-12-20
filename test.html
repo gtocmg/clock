@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widgets Horloge</title>
+
+    <!-- Lien vers le fichier manifest pour la PWA -->
+    <link rel="manifest" href="manifest.json">
+
+    <style>
+        body {
+            margin: 18px;
+            padding: 0;
+            background-color: #000000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .time-widget {
+            background-color: #000000;
+            padding: 0;
+            display: inline-block;
+            pointer-events: none;
+            user-select: none;
+            margin: 0 12px; /* Espace entre les horloges */
+        }
+
+        #Canada_z18a, #clock {
+            font-size: 24px;
+            margin-top: 0px;
+            line-height: 1;
+            font-weight: normal;
+        }
+
+        /* Disposition des horloges côte à côte */
+        .clock-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #time_is_link {
+            visibility: hidden;  /* Rendre le lien invisible */
+            pointer-events: none; /* Désactiver l'interaction avec le lien */
+        }        
+    </style>
+</head>
+<body>
+    <div class="clock-container">
+        <!-- Première horloge : Canada -->
+        <div class="time-widget">
+            <span id="Canada_z18a"></span>
+        </div>
+
+        <!-- Deuxième horloge : Heure NIST -->
+        <div class="time-widget">
+            <span id="clock">--:--:--</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://widget.time.is/t.js"></script>
+    <script>
+        // Widget Time.is pour l'heure du Canada
+        function refreshWidget() {
+            time_is_widget.init({Canada_z18a:{}}); 
+        }
+        refreshWidget();
+        setInterval(refreshWidget, 5000); // Rafraîchissement toutes les 5 secondes
+    </script>
+
+    <!-- Lien caché mais non cliquable -->
+    <a href="https://time.is/Canada" id="time_is_link" rel="nofollow"></a>
+
+    <script>
+        /* Code pour l'horloge NIST avec offset UTC-5 */
+
+        const FETCH_URL = 'https://time.gov/widget/dhtml/at_nist_use_only.cgi';
+        const FETCH_INTERVAL_MS = 10000;  // Toujours 10 secondes entre les appels réseau
+        const RENDER_INTERVAL_MS = 200;   // 200ms entre chaque rafraîchissement visuel (5 fois par seconde)
+        const EASTERN_OFFSET_HOURS = -5;
+
+        let serverMicro = null;
+        let serverPerfMs = null;
+        let lastRaw = null;
+
+                let lastShown = null;
+const clockEl = document.getElementById('clock');
+
+        function pad(n, len = 2) { return String(n).padStart(len, '0'); }
+
+        function formatHHMMSSFromMicroBig(currentMicroBig) {
+            const msBig = currentMicroBig / 1000n;
+            const msNumber = Number(msBig);
+            const shiftedMsForUTC = msNumber + EASTERN_OFFSET_HOURS * 3600_000;
+            const d = new Date(shiftedMsForUTC);
+            const hh = pad(d.getUTCHours(), 2);
+            const mm = pad(d.getUTCMinutes(), 2);
+            const ss = pad(d.getUTCSeconds(), 2);
+            return `${hh}:${mm}:${ss}`;
+        }
+
+        function render() {
+            if (serverMicro === null || serverPerfMs === null) {
+                if (lastShown !== '--:--:--') {
+                    clockEl.textContent = '--:--:--';
+                    lastShown = '--:--:--';
+                }
+                return;
+            }
+            const deltaMs = performance.now() - serverPerfMs;
+            const deltaMicro = BigInt(Math.round(deltaMs * 1000));
+            const currentMicro = serverMicro + deltaMicro;
+
+            const txt = formatHHMMSSFromMicroBig(currentMicro);
+            if (txt !== lastShown) {
+                clockEl.textContent = txt;
+                lastShown = txt;
+            }
+        }
+            const deltaMs = performance.now() - serverPerfMs;
+            const deltaMicro = BigInt(Math.round(deltaMs * 1000));
+            const currentMicro = serverMicro + deltaMicro;
+            clockEl.textContent = formatHHMMSSFromMicroBig(currentMicro);
+        }
+
+        async function fetchServerTime() {
+            try {
+                const resp = await fetch(FETCH_URL, {cache: 'no-store'});
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const text = (await resp.text()).trim();
+                lastRaw = text;
+                const m = text.match(/(\d{13,})/);
+                if (!m) throw new Error('Format invalide: ' + text);
+                serverMicro = BigInt(m[1]);
+                serverPerfMs = performance.now();
+                render();
+            } catch (e) {
+                console.warn('sync error', e);
+            }
+        }
+
+        fetchServerTime();
+        setInterval(fetchServerTime, FETCH_INTERVAL_MS);  // Rafraîchissement des données réseau toutes les 10 secondes
+        setInterval(render, RENDER_INTERVAL_MS);  // Rafraîchissement visuel toutes les 200ms (5 fois par seconde)
+    </script>
+</body>
+</html>
