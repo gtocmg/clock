@@ -4,11 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Widgets Horloge</title>
-
-    <!-- Lien vers le fichier manifest pour la PWA -->
-    <link rel="manifest" href="manifest.json">
-
-    <style>
+<style>
         body {
             margin: 18px;
             padding: 0;
@@ -82,7 +78,7 @@
 
         const FETCH_URL = 'https://time.gov/widget/dhtml/at_nist_use_only.cgi';
         const FETCH_INTERVAL_MS = 10000;  // Toujours 10 secondes entre les appels réseau
-        const RENDER_INTERVAL_MS = 200;   // 200ms entre chaque rafraîchissement visuel (5 fois par seconde)
+                const RENDER_INTERVAL_MS = 1000;  // 1s entre chaque rafraîchissement visuel (1 fois par seconde)
         const EASTERN_OFFSET_HOURS = -5;
 
         let serverMicro = null;
@@ -131,13 +127,13 @@ const clockEl = document.getElementById('clock');
 
         
         async function nistFetchText(url) {
-            // 1) Normal browser fetch (may fail due to CORS depending on origin)
+            // Browser fetch (may fail due to CORS when loaded from file://)
             try {
                 const resp = await fetch(url, { cache: 'no-store' });
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 return (await resp.text()).trim();
             } catch (e) {
-                // 2) Electron fallback: preload can expose window.nistProxyFetch(url) to bypass CORS safely
+                // Electron fallback: expose window.nistProxyFetch(url) via preload to bypass CORS safely
                 if (typeof window !== 'undefined' && typeof window.nistProxyFetch === 'function') {
                     const txt = await window.nistProxyFetch(url);
                     return String(txt || '').trim();
@@ -157,12 +153,8 @@ const clockEl = document.getElementById('clock');
                 render();
             } catch (e) {
                 console.warn('sync error', e);
-                // Show something visible so you know it's blocked (often CORS when loaded from file://)
-                if (lastShown !== 'NIST ERR') {
-                    clockEl.textContent = '--:--:--';
-                    clockEl.title = 'NIST sync error: ' + (e && e.message ? e.message : String(e));
-                    lastShown = 'NIST ERR';
-                }
+                // Tooltip visible for debugging
+                clockEl.title = 'NIST sync error: ' + (e && e.message ? e.message : String(e));
             }
         }
 
