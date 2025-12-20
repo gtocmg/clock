@@ -78,8 +78,10 @@
 
         const FETCH_URL = 'https://time.gov/widget/dhtml/at_nist_use_only.cgi';
         const FETCH_INTERVAL_MS = 10000;  // réseau: 10s
-        const RENDER_FALLBACK_MS = 250;   // boucle légère (le DOM ne change que si la seconde change)
+        const RENDER_FALLBACK_MS = 333;   // ~3x/sec (raisonnable)   // boucle légère (le DOM ne change que si la seconde change)
         const EASTERN_OFFSET_HOURS = -5;
+        const VISUAL_LEAD_MS = 140;       // avance visuelle pour coller à time.is (ajuste 80-200ms)
+
 
         let serverMicro = null;  // microsecondes (BigInt)
         let serverPerfMs = null; // perf.now() au moment de référence
@@ -111,7 +113,8 @@
             }
 
             const deltaMs = performance.now() - serverPerfMs;
-            const currentMicro = serverMicro + BigInt(Math.round(deltaMs * 1000));
+            const leadMicro = BigInt(VISUAL_LEAD_MS) * 1000n;
+            const currentMicro = serverMicro + BigInt(Math.round(deltaMs * 1000)) + leadMicro;
 
             const txt = formatHHMMSSFromMicroBig(currentMicro);
             if (txt !== lastShown) {
