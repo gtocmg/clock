@@ -78,7 +78,7 @@
 
         const FETCH_URL = 'https://time.gov/widget/dhtml/at_nist_use_only.cgi';
         const FETCH_INTERVAL_MS = 10000;  // Toujours 10 secondes entre les appels réseau
-        const RENDER_INTERVAL_MS = 1000;  // 1 seconde entre chaque rafraîchissement visuel (léger)
+        const RENDER_INTERVAL_MS = 250;   // boucle légère (250ms) pour coller au tick de la seconde
         const EASTERN_OFFSET_HOURS = -5;
 
         let serverMicro = null;
@@ -122,6 +122,8 @@ const clockEl = document.getElementById('clock');
         }
 
         async function fetchServerTime() {
+            // Mesure RTT pour corriger un peu le décalage (approx RTT/2)
+            const t0 = performance.now();
             try {
                 const resp = await fetch(FETCH_URL, {cache: 'no-store'});
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -130,7 +132,11 @@ const clockEl = document.getElementById('clock');
                 const m = text.match(/(\d{13,})/);
                 if (!m) throw new Error('Format invalide: ' + text);
                 serverMicro = BigInt(m[1]);
-                serverPerfMs = performance.now();
+                const t1 = performance.now();
+                // Corrige d'environ la moitié du RTT
+                const rttHalfMicro = BigInt(Math.round(((t1 - t0) / 2) * 1000));
+                serverMicro = serverMicro + rttHalfMicro;
+                serverPerfMs = t1;
                 render();
             } catch (e) {
                 console.warn('sync error', e);
@@ -138,10 +144,56 @@ const clockEl = document.getElementById('clock');
         }
 
         fetchServerTime();
-        setInterval(fetchServerTime, FETCH_INTERVAL_MS);  // Rafraîchissement des données réseau toutes les 10 secondes
+        setInterval(fetchServerTime, FETCH_INTERVAL_MS);  // Sync réseau périodique
+
+        // --- Render "synced" : aligne l'update sur le changement de seconde (évite d'avoir ~1s de retard) ---
+        let tickTimer = null;
+
+        function clearTick() {
+            if (tickTimer) { clearTimeout(tickTimer); tickTimer = null; }
+        }
+
+        function scheduleNextTick() {
+            clearTick();
+
+            if (serverMicro === null || serverPerfMs === null) {
+                tickTimer = setTimeout(scheduleNextTick, 500);
+                return;
+            }
+
+            // Temps courant estimé en microsecondes
+            const deltaMs = performance.now() - serverPerfMs;
+            const nowMicro = serverMicro + BigInt(Math.round(deltaMs * 1000));
+
+            // Combien de microsecondes avant la prochaine seconde exacte ?
+            const remainder = nowMicro % 1000000n;
+            let waitMicro = 1000000n - remainder;
+
+            // setTimeout est en ms; on convertit et on ajoute un mini-fudge pour éviter un tick trop tôt
+            let waitMs = Number(waitMicro / 1000n);
+            if (waitMs < 0) waitMs = 0;
+
+            tickTimer = setTimeout(() => {
+                // "Chasse" le tick: si on est encore avant le changement de seconde, on re-check vite
+                render();
+                // Petite boucle de rattrapage (max 3 fois) si le timer s'est déclenché trop tôt/trop tard
+                let tries = 0;
+                const chase = () => {
+                    tries++;
+                    render();
+                    if (tries < 3) setTimeout(chase, 20);
+                };
+                setTimeout(chase, 20);
+
+                scheduleNextTick();
+            }, waitMs);
+        }
+
+        // Aussi, on fait un render léger toutes les 250ms, mais le DOM ne bouge que si la seconde change
+        // (ça aide à réduire l'effet "lag" si le navigateur throttle les timers)
         setInterval(render, RENDER_INTERVAL_MS);
 
-        // (Optionnel) Évite du travail inutile quand l'onglet est en arrière-plan
+        scheduleNextTick();// (Optionnel) Évite du travail inutile quand l'onglet est en arrière-plan
         document.addEventListener('visibilitychange', () => {
             // Rien de spécial à faire: le render est déjà léger (1Hz),
             // mais tu peux stopper/relancer les intervals ici si tu veux.
